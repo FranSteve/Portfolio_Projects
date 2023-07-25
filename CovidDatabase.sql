@@ -15,7 +15,7 @@ From PortfolioProject..CovidDeaths
 Order by 1,2
 
 
--- Looking at total Cases vstotal deaths
+-- Looking at total Cases vs total deaths
 -- Shows likelihood of dying if you contract covid in your country
 Select location, date, total_cases , total_deaths, (cast(total_deaths as float)/cast(total_cases as float))*100 as DeathPercentage
 From PortfolioProject..CovidDeaths
@@ -89,7 +89,7 @@ Where dea.continent is not null
 Order by 2,3 
 
 
--- Summing up the newvaccinations by using partition by two see the total vaccinations done untill a particular day
+-- Summing up the new vaccinations by using partition by two see the total vaccinations done untill a particular day
 Select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, 
 SUM(CAST(vac.new_vaccinations as float)) OVER (Partition by dea.location order by dea.location , dea.date) as VaccinationRollingCount
 From PortfolioProject..CovidDeaths dea
