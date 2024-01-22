@@ -3,15 +3,17 @@
 
  --**************************************************************************
 
- --"Standardize Date Format"
+ --Standardize the Date Format
 
  Select SaleDate, Convert(Date,SaleDate)
  From PortfolioProject..NashvilleHousing
  
  Update NashvilleHousing
  SET SaleDate = CONVERT(Date, SaleDate)
- --Basically this directly updates the Date column with the converted format of date. 
- --But for some reason this command isn't working. So Im going the add a new column and fill it with the newly updated date.
+ 
+--The above script directly rewrites the date column with the converted format of date 
+--But if you want to keep the original column as it is and add another column 
+--and populte it with converted format then the below code needs to be executed 
 
  ALTER TABLE NashvilleHousing
  Add SaleDateConverted Date;
@@ -23,15 +25,13 @@
 
  --****************************************************************************
 
-
- --"Populate Property Address Data"
+ --"Populate Null Property Address Data"
 
  Select *
  From PortfolioProject..NashvilleHousing
  Where PropertyAddress is NULL
  --Found that there are few line items where the Property Address is null
 
- 
  Select *
  From PortfolioProject..NashvilleHousing
  Order By ParcelID
@@ -39,13 +39,14 @@
  --So we will be using this logic to populate the null property addresses
 
 
- Select a.ParcelID, a.PropertyAddress, b.ParcelID, B.PropertyAddress, ISNULL(a.PropertyAddress, b.PropertyAddress)
+ Select a.ParcelID, a.PropertyAddress, b.ParcelID, b.PropertyAddress, ISNULL(a.PropertyAddress, b.PropertyAddress)
  From PortfolioProject..NashvilleHousing a
  Join PortfolioProject..NashvilleHousing b
 	ON a.parcelID=b.ParcelID
 	AND a.[UniqueID ]<>b.[UniqueID ]
  WHERE a.PropertyAddress is NULL
- --By joining the table to itself on same parcel ids, we found the addresses that needs to be populated in the null addresses
+ --By joining the table to itself on a condition of same parcel ids but different unique ids, 
+ -- we found the address that needs to be populated in the null addresses
  --The last column generated from ISNULL is the column that needs to be populated in "a.PropertyAddress"
 
 
