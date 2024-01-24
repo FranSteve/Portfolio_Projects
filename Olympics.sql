@@ -120,10 +120,25 @@ Order By 1
 
 -- 9. Fetch oldest athletes to win a gold medal
 
-Select * 
+
+with t1 as
+(
+Select Name, Age, Medal
 From Olympics
-Where Medal ='Gold' AND Age = 64
-Order By Age DESC
+Where Medal ='Gold'
+Group By Name,Age,Medal
+),
+
+t2 as 
+(
+Select *, Rank() over (order by Age DESC) as Rnk
+From t1
+)
+
+Select *
+From t2
+Where Rnk = 1
+
 
 
 
@@ -136,17 +151,19 @@ With t1 as
 	Group By Sex
 	),
 t2 as
-	(Select *, row_number() Over (order by Cnt) as Rnk
-	From t1),
-min_cnt as
+	(
+	Select *, row_number() Over (order by Sex DESC) as Rnk
+	From t1
+	),
+male_cnt as
 	(select cnt 
 	from t2	where rnk = 1),
-max_cnt as
+female_cnt as
 	(select cnt 
 	from t2	where rnk = 2)
 
-Select max_cnt.cnt/min_cnt.cnt as ratio
-from min_cnt, max_cnt;
+Select concat('1: ', round (cast(male_cnt.cnt as float)/ cast(female_cnt.cnt as float),2)) as ratio
+from male_cnt, female_cnt
 
 
 --11. Fetch the top 5 athletes who have won the most gold medals.
@@ -172,7 +189,7 @@ Order BY 3,1
 
 
 
---12. Fetch the top 5 athletes who have won the most medals
+--12. Fetch the top 5 athletes who have won the most medals (Gold/Silver/Bronze)
 
 with t4 as
 (
@@ -219,37 +236,123 @@ Where Rnk <6
 
 --14. List down total gold, silver and bronze medals won by each country.
 
-Select noc.Region as Country, medal, Count(Medal)
+Select Country, Gold, Silver, Bronze
+From 
+(Select noc.Region as Country, medal, Count(Medal) as Total_Medals
 From olympics ol
 Join noc_regions noc
 ON noc.NOC = ol.noc
 Where Medal <> 'NA'
 Group By noc.Region,medal
-Order By 1,2
+--Order By 1,2
+) as t1
+PIVOT
+(
+   Sum(Total_Medals)
+   For medal
+   IN ([Gold], [Silver],[Bronze])
+)
+as PivotTable
+Order By Gold DESC
+
 
 
 --15. List down total gold, silver and bronze medals won by each country corresponding to each olympic games.
 
-Select Games, Region as Country , Medal, Count(Medal)
+with t1 as
+(Select Games, Region as Country , Medal, Count(Medal) as Total_Medals
 From olympics ol
 Join noc_regions noc
 ON noc.NOC = ol.noc
 Where Medal <> 'NA'
 Group By Region,Medal,Games
-Order By 1,2,3
+--Order By 1,2,3
+)
+Select Games, Country, Gold, Silver, Bronze
+From t1
+Pivot
+(
+	Sum(Total_Medals)
+    For medal
+    IN ([Gold], [Silver],[Bronze])
+)
+as PivotTable
+Order By Games,Country
 
 
 
 --16. Identify which country won the most gold, most silver and most bronze medals in each olympic games.
+with t1 as
+(Select Games, Region as Country , Medal, Count(Medal) as Total_Medals
+From olympics ol
+Join noc_regions noc
+ON noc.NOC = ol.noc
+Where Medal <> 'NA'
+Group By Region,Medal,Games
+--Order By 1,3,4 DESC
+),
 
---17. Identify which country won the most gold, most silver, most bronze medals and the most medals in each olympic games.
+t2 as 
+(Select *, Rank() over (partition by Games, Medal Order By Total_medals DESC) as Rnk
+From t1
+),
 
---18. Which countries have never won gold medal but have won silver/bronze medals?
+t3 as
+(Select Games, Country, Medal, Total_Medals, CONCAT(Country,'-',Total_Medals) as Country_Medals
+From t2
+Where Rnk =1
+),
+
+t4 as
+(
+Select Games, Medal, Country_Medals
+From t3
+)
+
+Select Games, Gold, Silver, Bronze
+From t4
+Pivot
+(
+	Max(Country_Medals)
+    For medal
+    IN ([Gold], [Silver],[Bronze])
+)as PivotTable
 
 
 
 
---19. In which Sport/event, India has won highest medals.
+--17. Which countries have never won gold medal but have won silver/bronze medals?
+
+
+with t2 as
+(
+Select Country, Gold, Silver, Bronze
+From 
+(Select Region as Country , Medal, Count(Medal) as Total_Medals
+From olympics ol
+Join noc_regions noc
+ON noc.NOC = ol.noc
+Where Medal <> 'NA'
+Group By Region, Medal
+--Order By 1,2,3
+) as t1
+Pivot
+(
+	Sum(Total_Medals)
+    For medal
+    IN ([Gold], [Silver],[Bronze])
+)as PivotTable
+)
+
+Select *
+From t2
+Where Gold is null AND NOT Silver is null AND NOT Bronze is null
+Order By 2 DESC,3 DESC 
+
+
+
+
+--18. In which Sport/event, India has won highest medals.
 
 with t1 as
 (
@@ -260,7 +363,7 @@ ON noc.noc = ol.noc
 Where Medal <> 'NA' AND Region = 'INDIA'
 Group By Sport
 ),
-t2 as 
+t2 as
 (
 Select *,rank() over (Order By total_medals DESC) as rnk
 From t1
@@ -268,9 +371,10 @@ From t1
 
 Select Sport, Total_Medals
 From t2
-Where rnk <2
+Where rnk =1
 
---20. Break down all olympic games where India won medal for Hockey and how many medals in each olympic games
+
+--19. Break down all olympic games where India won medal for Hockey and how many medals in each olympic games
 
 Select Region, Games,Sport, Count(Medal) as Total_medals
 From Olympics ol
@@ -279,3 +383,21 @@ ON noc.noc = ol.noc
 Where Medal <> 'NA' AND Region = 'INDIA' AND Sport='Hockey'
 Group By Games,Medal, Sport,Region
 Order By 2
+
+
+Select *
+From(
+Select Region, 
+SUM(case when medal = 'Gold' then 1 else 0 end) as Gold,
+SUM(case when medal = 'Silver' then 1 else 0 end) as Silver,
+SUM(case when medal = 'Bronze' then 1 else 0 end) as Bronze
+From Olympics ol
+Join noc_regions noc
+ON noc.noc = ol.noc
+Group By Region
+)a
+Where Gold=0 AND Silver <> 0 AND Bronze <> 0
+Order By 2 DESC, 3 DESC, 4 DESC
+
+Select *
+From Olympics
